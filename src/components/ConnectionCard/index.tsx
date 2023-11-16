@@ -1,9 +1,8 @@
-import { Connection } from '@store/connections'
-import { Computer } from 'lucide-react-native'
-import { Text, TextProps } from 'react-native'
+import { Connection, useConnections } from '@store/connections'
+import { Computer, Trash } from 'lucide-react-native'
+import { Text, TextProps, TouchableOpacityProps } from 'react-native'
 import styled from 'styled-components/native'
 import * as DocumentPicker from 'expo-document-picker'
-import * as FileSystem from 'expo-file-system'
 
 interface ConnectionCardProps {
   connection: Connection
@@ -35,8 +34,10 @@ interface StatusProps extends TextProps {
 
 const Status = styled.Text<StatusProps>`
   margin-left: auto;
-  font-size: 12px;
-  color: ${(props) =>
+  width: 10px;
+  height: 10px;
+  border-radius: 99999px;
+  background: ${(props) =>
     props.status === 'connected'
       ? '#22af12'
       : props.status === 'disconnected'
@@ -50,14 +51,30 @@ const ButtonsContainer = styled.View`
   gap: 6px;
 `
 
-const SelectFileButton = styled.TouchableOpacity`
+interface SelectFileButtonProps extends TouchableOpacityProps {
+  disabled?: boolean
+}
+const SelectFileButton = styled.TouchableOpacity<SelectFileButtonProps>`
   flex: 1;
   background: #242436;
   padding: 4px 10px;
   border-radius: 6px;
+  opacity: ${(props) => (props.disabled ? '0.5' : '1')};
+`
+
+const TrashButton = styled.TouchableOpacity<SelectFileButtonProps>`
+  background: #242436;
+  padding: 4px 10px;
+  border-radius: 6px;
+  opacity: ${(props) => (props.disabled ? '0.5' : '1')};
 `
 
 export function ConnectionCard({ connection }: ConnectionCardProps) {
+  const { uploadsTask, removeConnection } = useConnections((state) => ({
+    uploadsTask: state.uploads,
+    removeConnection: state.remove,
+  }))
+
   async function handleSendDocument() {
     const result = await DocumentPicker.getDocumentAsync({
       multiple: true,
@@ -67,59 +84,48 @@ export function ConnectionCard({ connection }: ConnectionCardProps) {
       return
     }
 
-    const chunkSize = 1024 * 512
-    let tasks = result.assets.length
+    uploadsTask(result, connection.idConnection)
+  }
 
-    result.assets.forEach(async (asset) => {
-      const fileData = asset
+  async function handleConnect() {
+    connection.socket.connect()
+  }
 
-      const fileBase64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: 'base64',
-      })
-
-      let offset = 0
-      let chunkPart = 0
-      while (offset < fileBase64.length) {
-        const nextLoopVerification = offset + chunkSize > fileBase64.length
-
-        const chunk = fileBase64.slice(offset, offset + chunkSize)
-
-        connection.socket.emit('file-chunk', {
-          metadata: {
-            ...fileData,
-            sendingChunk:
-              offset + chunkSize > fileBase64.length
-                ? fileBase64.length
-                : offset + chunkSize,
-            base64Size: fileBase64.length,
-          },
-          tasks,
-          content: chunk,
-          chunkPart,
-          end: !!nextLoopVerification,
-        })
-
-        offset += chunkSize
-        chunkPart++
-      }
-
-      chunkPart = 0
-      tasks--
-    })
+  async function handleDisconnect() {
+    connection.socket.disconnect()
   }
 
   return (
     <Container>
       <Header>
         <Computer color="#121214" size={20} />
-        <Title>{connection.ip}</Title>
-        <Status status={connection.status}>{connection.status}</Status>
+        <Title>{connection.idConnection}</Title>
+        <Status status={connection.status} />
       </Header>
 
       <ButtonsContainer>
-        <SelectFileButton onPress={handleSendDocument}>
+        <SelectFileButton
+          disabled={connection.status !== 'connected'}
+          onPress={handleSendDocument}
+        >
           <Text style={{ color: 'white' }}>Enviar</Text>
         </SelectFileButton>
+
+        {connection.status === 'disconnected' && (
+          <SelectFileButton onPress={handleConnect}>
+            <Text style={{ color: 'white' }}>Conectar</Text>
+          </SelectFileButton>
+        )}
+
+        {connection.status === 'connected' && (
+          <SelectFileButton onPress={handleDisconnect}>
+            <Text style={{ color: 'white' }}>Desconectar</Text>
+          </SelectFileButton>
+        )}
+
+        <TrashButton onPress={() => removeConnection(connection)}>
+          <Trash color="white" size={16} />
+        </TrashButton>
       </ButtonsContainer>
     </Container>
   )

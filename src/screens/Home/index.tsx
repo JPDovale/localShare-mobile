@@ -11,6 +11,13 @@ import { ConnectionCard } from '@components/ConnectionCard'
 
 const Container = styled(SafeAreaView)`
   padding: 16px 18px;
+  flex: 1;
+`
+
+const Title = styled.Text`
+  font-family: Roboto_700Bold;
+  font-size: 32px;
+  margin-bottom: 10px;
 `
 
 const Label = styled.Text`
@@ -19,14 +26,9 @@ const Label = styled.Text`
 `
 
 const ConnectionFormSchema = z.object({
-  ip: z
-    .string({
-      required_error: 'Informe um endereço de ip',
-    })
-    .ip({
-      version: 'v4',
-      message: 'Endereço ip inválido',
-    }),
+  idConnection: z.string({
+    required_error: 'Informe um id de conexão',
+  }),
 })
 
 type ConnectionFormData = z.infer<typeof ConnectionFormSchema>
@@ -47,14 +49,30 @@ export function HomePage() {
   })
 
   async function handleConnect(data: ConnectionFormData) {
-    addConnection(data.ip)
+    addConnection(data.idConnection)
     reset()
   }
 
   return (
     <Container>
-      <Label>Para começar digite o ip do dispositivo para se conectar</Label>
-      {errors.ip?.message && <Label>{errors.ip.message}</Label>}
+      <Title>Bem vindo(a) ao Smart Sharer</Title>
+      <FlatList
+        data={connections}
+        renderItem={({ item }) => (
+          <ConnectionCard key={item.idConnection} connection={item} />
+        )}
+        contentContainerStyle={{
+          paddingBottom: 18,
+          gap: 10,
+        }}
+      />
+
+      <Label>
+        Para começar digite o id de conexão do dispositivo para se conectar
+      </Label>
+      {errors.idConnection?.message && (
+        <Label>{errors.idConnection.message}</Label>
+      )}
 
       <Input.Root>
         <Input.Icon>
@@ -63,11 +81,10 @@ export function HomePage() {
 
         <Controller
           control={control}
-          name="ip"
+          name="idConnection"
           render={({ field: { onBlur, onChange, value } }) => (
             <Input.TextInput
-              keyboardType="numeric"
-              placeholder="192.168.x.x"
+              placeholder="XXXX-XXX-XXX-XXX-X"
               onBlur={onBlur}
               onChangeText={onChange}
               value={value}
@@ -81,17 +98,6 @@ export function HomePage() {
           </Input.Icon>
         </TouchableOpacity>
       </Input.Root>
-
-      <FlatList
-        data={connections}
-        renderItem={({ item }) => (
-          <ConnectionCard key={item.ip} connection={item} />
-        )}
-        contentContainerStyle={{
-          paddingTop: 18,
-          paddingBottom: 40,
-        }}
-      />
     </Container>
   )
 }
